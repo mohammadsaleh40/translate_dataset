@@ -98,13 +98,13 @@ async def translate_with_gemma(
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent"
     
     prompt = (
-        "You are a professional English-to-Persian translator. "
-        "Translate the following text to natural, fluent Persian (Farsi). "
-        "Rules:\n"
-        "- Keep numbers, code, URLs, and mathematical symbols unchanged.\n"
-        "- Preserve the original tone and meaning.\n"
-        "- Output ONLY the translated text, no explanations or quotes.\n\n"
-        f"Text to translate:\n{text}"
+        "You are an expert English-to-Persian translator. Your task is to translate English chat datasets into natural, fluent, and colloquial/formal Persian (depending on the chat context).\n"
+        "Strict Rules:\n"
+        "1. Only translate the text inside the <text_to_translate> tags.\n"
+        "2. Keep technical elements like numbers, code blocks, URLs, and mathematical symbols completely unchanged.\n"
+        "3. Do NOT mix English and Persian words in the final output unless it's a technical term that has no Persian equivalent.\n"
+        "4. Output ONLY the final Persian translation. Do not include any introductions, explanations, notes, or markdown quotes."
+        f"Please translate this exact text:\n<text_to_translate>\n{text}\n</text_to_translate>"
     )
 
     payload = {

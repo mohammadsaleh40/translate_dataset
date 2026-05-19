@@ -97,22 +97,20 @@ async def translate_with_gemma(
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent"
     
+    # 🎯 پرامپت فوق‌العاده ساده و قاطع
     prompt = (
-        "You are an expert English-to-Persian translator. Your task is to translate English chat datasets into natural, fluent, and colloquial/formal Persian (depending on the chat context).\n"
-        "Strict Rules:\n"
-        "1. Only translate the text inside the <text_to_translate> tags.\n"
-        "2. Keep technical elements like numbers, code blocks, URLs, and mathematical symbols completely unchanged.\n"
-        "3. Do NOT mix English and Persian words in the final output unless it's a technical term that has no Persian equivalent.\n"
-        "4. Output ONLY the final Persian translation. Do not include any introductions, explanations, notes, or markdown quotes."
-        f"Please translate this exact text:\n<text_to_translate>\n{text}\n</text_to_translate>"
+        f"Translate the following English text to natural Persian (Farsi). "
+        f"Output ONLY the translated text. No explanations, no notes, no English words.\n\n"
+        f"English: {text}\n\n"
+        f"Persian:"
     )
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 0.1,
-            "top_p": 0.95,
-            "max_output_tokens": 4096
+            "temperature": 0.05,      # کاهش خلاقیت برای ترجمه دقیق‌تر
+            "top_p": 0.9,
+            "max_output_tokens": 2048  # کاهش برای جلوگیری از خروجی‌های طولانی
         }
     }
 
@@ -126,7 +124,11 @@ async def translate_with_gemma(
             
             if response.status == 200:
                 data = await response.json()
-                result = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                raw_output = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                
+                # 🧹 پاک‌سازی خروجی: حذف هرگونه متن اضافه
+                result = clean_translation_output(raw_output, text)
+                
                 _runtime_cache[text] = result
                 return result
             
@@ -148,6 +150,47 @@ async def translate_with_gemma(
         print(f"\n❌ خطا: {type(e).__name__}: {e}")
         return None
 
+
+# ---------------------------------------------------------
+# تابع پاک‌سازی خروجی مدل (حذف استدلال‌ها و متن‌های اضافه)
+# ---------------------------------------------------------
+def clean_translation_output(raw_output: str, original_text: str) -> str:
+    """
+    خروجی خام مدل را می‌گیرد و فقط ترجمه خالص فارسی را برمی‌گرداند.
+    """
+    lines = raw_output.split('\n')
+    
+    # ۱. حذف خطوطی که با * یا - یا عدد + نقطه شروع می‌شوند (استدلال مدل)
+    cleaned_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        # حذف خطوطی که الگوی "کلمه: توضیح" دارند (مثل "Draft: ...")
+        if ':' in stripped and len(stripped.split(':')[0]) < 20:
+            continue
+        # حذف خطوطی که با بولت‌پوینت شروع می‌شوند
+        if stripped.startswith(('*', '-', '•', '→', '✓', '✗')):
+            continue
+        # حذف خطوطی که حاوی کلمات انگلیسی راهنما هستند
+        if any(kw in stripped.lower() for kw in ['role:', 'task:', 'draft:', 'rule', 'only translate', 'output only']):
+            continue
+        # اگر خط بیشتر از ۵۰٪ حروف فارسی دارد، نگه دار
+        persian_chars = sum(1 for c in stripped if '\u0600' <= c <= '\u06FF')
+        if len(stripped) > 0 and persian_chars / len(stripped) > 0.5:
+            cleaned_lines.append(stripped)
+    
+    # ۲. اگر چیزی باقی ماند، به هم بچسبان
+    if cleaned_lines:
+        result = ' '.join(cleaned_lines).strip()
+        # حذف پرانتزهای توضیحی انگلیسی مثل "(Ken)" یا "(Jelly beans)"
+        import re
+        result = re.sub(r'\([^)]*[\u0041-\u007A]+[^)]*\)', '', result)  # حذف پرانتز با محتوای انگلیسی
+        result = re.sub(r'\s+', ' ', result).strip()  # حذف فضاهای اضافه
+        return result
+    
+    # ۳. اگر هیچ خط فارسی پیدا نشد، کل خروجی را برگردان (fallback)
+    return raw_output.strip()
 # ---------------------------------------------------------
 # ترجمه یک متن واحد (wrapper با مدیریت کلید)
 # ---------------------------------------------------------

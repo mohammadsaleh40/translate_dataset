@@ -18,7 +18,7 @@ load_dotenv()
 # ---------------------------------------------------------
 # تنظیمات و ثابت‌ها
 # ---------------------------------------------------------
-MODEL_NAME = os.getenv("MODEL_NAME", "gemma-3-27b-it")
+MODEL_NAME = os.getenv("MODEL_NAME", "gemma-4-31b-it")
 MAX_CONCURRENT = int(os.getenv("MAX_CONCURRENT", "12"))
 
 # محدودیت‌های API
